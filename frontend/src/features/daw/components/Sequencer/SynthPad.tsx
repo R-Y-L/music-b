@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import * as Tone from 'tone'
 import { instrumentPresets } from '../../audio/presets'
 
@@ -62,31 +62,50 @@ export const SynthPad = ({ trackId: _trackId, octave: initialOctave = 4, onNoteP
   // 更新合成器预设
   useEffect(() => {
     if (synth) {
-      const presetConfig = instrumentPresets[currentPreset as keyof typeof instrumentPresets]
+      const presetConfig = instrumentPresets[currentPreset as keyof typeof instrumentPresets] as { 
+        name: string
+        type: string
+        settings?: Record<string, unknown>
+        options?: Record<string, unknown>
+      } | undefined
+      
       if (presetConfig) {
-        // 应用预设设置到合成器
-        if (presetConfig.settings) {
-          Object.entries(presetConfig.settings).forEach(([key, value]) => {
-            if (synth && synth[key as keyof Tone.PolySynth<Tone.Synth>]) {
-              const synthProp = synth[key as keyof Tone.PolySynth<Tone.Synth>]
-              if (synthProp && typeof synthProp === 'object' && value && typeof value === 'object') {
-                Object.assign(synthProp, value)
-              }
+        // 应用预设设置到合成器（支持 settings 或 options）
+        const config = presetConfig.settings || presetConfig.options
+        if (config && typeof config === 'object') {
+          // 只应用支持的属性
+          if ('oscillator' in config && config.oscillator) {
+            try {
+              synth.set({ oscillator: config.oscillator as Partial<Tone.OmniOscillatorOptions> })
+            } catch {
+              // 忽略不支持的配置
             }
-          })
+          }
+          if ('envelope' in config && config.envelope) {
+            try {
+              synth.set({ envelope: config.envelope as Partial<Tone.EnvelopeOptions> })
+            } catch {
+              // 忽略不支持的配置
+            }
+          }
         }
       }
     }
   }, [currentPreset, synth])
 
-  const handleNoteDown = (note: string) => {
+  const handleNoteDown = async (note: string) => {
+    // 确保音频上下文已启动
+    if (Tone.context.state !== 'running') {
+      await Tone.start()
+    }
+    
     if (!activeNotes.has(note) && synth) {
       setActiveNotes(prev => new Set([...prev, note]))
       
       // 播放音符
-      synth.triggerAttack(note, undefined, 0.3)
+      synth.triggerAttack(note, undefined, 0.7)
       
-      onNotePlay(note, 80) // 默认力度
+      onNotePlay(note, 100) // 默认力度
     }
   }
 

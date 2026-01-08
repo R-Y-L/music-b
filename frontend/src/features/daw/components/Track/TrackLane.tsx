@@ -15,7 +15,7 @@ export const TrackLane = ({
   pixelsPerSecond,
   onClipClick 
 }: TrackLaneProps) => {
-  const { config, clips } = track
+  const { config, clips, patterns } = track
 
   return (
     <div 
@@ -25,6 +25,45 @@ export const TrackLane = ({
         width: timelineWidth
       }}
     >
+      {/* Pattern 块 */}
+      {patterns.map((pattern) => {
+        const hasContent = pattern.notes.length > 0 || 
+          (pattern.drumPattern && Object.values(pattern.drumPattern).some(beats => beats.some(b => b)))
+        
+        if (!hasContent) return null
+        
+        return (
+          <div 
+            key={pattern.id} 
+            className="pattern-block" 
+            style={{ 
+              backgroundColor: config.color,
+              left: pattern.startTime * pixelsPerSecond,
+              width: pattern.duration * pixelsPerSecond,
+              opacity: 0.8
+            }}
+            onClick={() => onClipClick?.({ 
+              id: pattern.id, 
+              start: pattern.startTime, 
+              duration: pattern.duration,
+              name: pattern.name
+            })}
+          >
+            <div className="pattern-content">
+              <div className="pattern-name">{pattern.name}</div>
+              <div className="pattern-info">
+                {config.type === 'drums' && pattern.drumPattern && (
+                  <span>🥁 {Object.values(pattern.drumPattern).flat().filter(Boolean).length} hits</span>
+                )}
+                {config.type === 'instrument' && pattern.notes.length > 0 && (
+                  <span>🎹 {pattern.notes.length} notes</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      
       {/* 音频片段 */}
       {clips.map((clip) => (
         <div 

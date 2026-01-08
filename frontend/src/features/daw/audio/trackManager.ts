@@ -1,14 +1,40 @@
 import * as Tone from 'tone'
+import { instrumentPresets } from './presets'
+
+export type TrackType = 'instrument' | 'drums' | 'audio'
+
+export interface PatternNote {
+  id: string
+  note: string      // e.g., "C4", "D#5"
+  velocity: number  // 0-127
+  time: number      // in beats/steps
+  duration: number  // in beats/steps
+}
+
+export interface DrumPattern {
+  [key: string]: boolean[]  // e.g., { kick: [true, false, ...], snare: [...] }
+}
+
+export interface TrackPattern {
+  id: string
+  name: string
+  notes: PatternNote[]
+  drumPattern?: DrumPattern
+  startTime: number  // where pattern starts on timeline
+  duration: number   // pattern length in beats
+}
 
 export interface TrackConfig {
   id: string
   name: string
+  type: TrackType
   color: string
   volume: number
   pan: number
   muted: boolean
   solo: boolean
   effects: string[]
+  instrument?: string  // synth preset name
 }
 
 export interface AudioClip {
@@ -23,8 +49,10 @@ export interface AudioClip {
 export class AudioTrack {
   public config: TrackConfig
   public clips: AudioClip[] = []
+  public patterns: TrackPattern[] = []
   public channel: Tone.Channel
   private effects: Tone.ToneAudioNode[] = []
+  public synth: Tone.PolySynth | Tone.Synth | null = null
 
   constructor(config: TrackConfig) {
     this.config = config
@@ -35,6 +63,91 @@ export class AudioTrack {
       pan: normalizedPan,
       mute: config.muted
     }).toDestination()
+
+    // 根据轨道类型创建合成器
+    if (config.type === 'instrument') {
+      // 使用配置的乐器预设
+      const presetKey = config.instrument || 'synth'
+      const preset = instrumentPresets[presetKey as keyof typeof instrumentPresets] as {
+        name: string
+        type: string
+        settings?: Record<string, unknown>
+        options?: Record<string, unknown>
+      } | undefined
+      
+      // 获取预设配置 - 支持 settings 或 options
+      const rawConfig = preset?.settings || preset?.options
+      
+      if (rawConfig) {
+        // 只提取 Tone.Synth 支持的属性
+        const synthOptions: Partial<Tone.SynthOptions> = {}
+        
+        if (rawConfig.oscillator) {
+          synthOptions.oscillator = rawConfig.oscillator as Partial<Tone.OmniOscillatorOptions>
+        }
+        if (rawConfig.envelope) {
+          synthOptions.envelope = rawConfig.envelope as Partial<Tone.EnvelopeOptions>
+        }
+        
+        this.synth = new Tone.PolySynth(Tone.Synth, synthOptions).connect(this.channel)
+      } else {
+        // 默认合成器
+        this.synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: {
+            attack: 0.02,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.8
+          }
+        }).connect(this.channel)
+      }
+    }
+  }
+
+  // 添加 pattern
+  addPattern(pattern: Omit<TrackPattern, 'id'>): TrackPattern {
+    const newPattern: TrackPattern = {
+      ...pattern,
+      id: `pattern_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+    }
+    this.patterns.push(newPattern)
+    return newPattern
+  }
+
+  // 获取当前 pattern (简化：取第一个或创建默认)
+  getCurrentPattern(): TrackPattern {
+    if (this.patterns.length === 0) {
+      return this.addPattern({
+        name: 'Pattern 1',
+        notes: [],
+        drumPattern: this.config.type === 'drums' ? {
+          kick: Array(16).fill(false),
+          snare: Array(16).fill(false),
+          hihat: Array(16).fill(false),
+          openhat: Array(16).fill(false)
+        } : undefined,
+        startTime: 0,
+        duration: 4
+      })
+    }
+    return this.patterns[0]
+  }
+
+  // 更新 pattern 音符
+  updatePatternNotes(patternId: string, notes: PatternNote[]): void {
+    const pattern = this.patterns.find(p => p.id === patternId)
+    if (pattern) {
+      pattern.notes = notes
+    }
+  }
+
+  // 更新鼓机 pattern
+  updateDrumPattern(patternId: string, drumPattern: DrumPattern): void {
+    const pattern = this.patterns.find(p => p.id === patternId)
+    if (pattern) {
+      pattern.drumPattern = drumPattern
+    }
   }
 
   addClip(clip: AudioClip): void {
@@ -70,6 +183,9 @@ export class AudioTrack {
   dispose(): void {
     this.channel.dispose()
     this.effects.forEach(effect => effect.dispose())
+    if (this.synth) {
+      this.synth.dispose()
+    }
   }
 }
 

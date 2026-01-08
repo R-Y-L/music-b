@@ -9,11 +9,14 @@ export { audioEngine } from './audio/engine'
 export { trackManager, TrackManager, AudioTrack, type TrackConfig, type AudioClip } from './audio/trackManager'
 export { instrumentPresets, effectPresets, drumPatterns, tempoPresets, drumKitPresets, musicTheory } from './audio/presets'
 
+// 音频上下文 Provider
+export { DAWAudioProvider, useDAWAudio } from './context/AudioContext'
+
 // Hooks
 export { useAudioEngine, type AudioEngineState, type Track, type Pattern, type Note, type Effect } from './hooks/useAudioEngine'
 
 // Sequencer 组件
-export { PianoRoll } from './components/Sequencer/PianoRoll'
+export { PianoRoll, type PianoNote } from './components/Sequencer/PianoRoll'
 export { DrumMachine } from './components/Sequencer/DrumMachine'
 export { SynthPad } from './components/Sequencer/SynthPad'
 export { Timeline } from './components/Sequencer/Timeline'

@@ -36,11 +36,11 @@ export const DrumMachine = ({
   currentStep 
 }: DrumMachineProps) => {
   const [selectedSound, setSelectedSound] = useState<string | null>(null)
-  const [drumSynths, setDrumSynths] = useState<Record<string, any>>({})
+  const [drumSynths, setDrumSynths] = useState<Record<string, Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth | Tone.Synth>>({})
 
   // 初始化鼓声合成器
   useEffect(() => {
-    const synths: Record<string, any> = {}
+    const synths: Record<string, Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth | Tone.Synth> = {}
     
     // 为每个鼓声创建对应的合成器
     DRUM_SOUNDS.forEach(sound => {
@@ -59,41 +59,43 @@ export const DrumMachine = ({
           }).toDestination()
           break
         case 'hihat':
-        case 'openhat':
-          synths[sound.key] = new Tone.MetalSynth({
-            frequency: 200,
+        case 'openhat': {
+          const hihat = new Tone.MetalSynth({
             envelope: { attack: 0.001, decay: 0.1, release: 0.1 },
             harmonicity: 5.1,
             modulationIndex: 32,
             resonance: 400,
             octaves: 1.5
           }).toDestination()
+          synths[sound.key] = hihat
           break
-        case 'crash':
-          synths[sound.key] = new Tone.MetalSynth({
-            frequency: 300,
+        }
+        case 'crash': {
+          const crash = new Tone.MetalSynth({
             envelope: { attack: 0.001, decay: 0.5, release: 1 },
             harmonicity: 5.1,
             modulationIndex: 64,
             resonance: 2000,
             octaves: 1.5
           }).toDestination()
+          synths[sound.key] = crash
           break
-        case 'ride':
-          synths[sound.key] = new Tone.MetalSynth({
-            frequency: 400,
+        }
+        case 'ride': {
+          const ride = new Tone.MetalSynth({
             envelope: { attack: 0.001, decay: 0.3, release: 0.5 },
             harmonicity: 3.1,
             modulationIndex: 48,
             resonance: 3000,
             octaves: 1
           }).toDestination()
+          synths[sound.key] = ride
           break
+        }
         case 'clap':
           synths[sound.key] = new Tone.NoiseSynth({
-            noise: { type: "white", playbackRate: 0.5 },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0 },
-            filter: { Q: 1.5, type: "highpass", rolloff: -24 }
+            noise: { type: "white" },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0 }
           }).toDestination()
           break
         case 'perc':
@@ -110,26 +112,41 @@ export const DrumMachine = ({
     setDrumSynths(synths)
     
     return () => {
-      Object.values(synths).forEach((synth: any) => synth.dispose())
+      Object.values(synths).forEach((synth) => synth.dispose())
     }
   }, [])
 
+  // 触发鼓声的辅助函数
+  const playDrumSound = (synth: Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth | Tone.Synth) => {
+    if (synth instanceof Tone.NoiseSynth) {
+      synth.triggerAttackRelease("8n")
+    } else if (synth instanceof Tone.MetalSynth) {
+      synth.triggerAttackRelease("C2", "8n")
+    } else {
+      synth.triggerAttackRelease("C2", "8n")
+    }
+  }
+
   // 当前步骤变化时触发声音
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && Tone.context.state === 'running') {
       DRUM_SOUNDS.forEach(sound => {
         if (pattern[sound.key]?.[currentStep]) {
-          // 播放声音
           const synth = drumSynths[sound.key]
           if (synth) {
-            synth.triggerAttackRelease("C2", "8n")
+            playDrumSound(synth)
           }
         }
       })
     }
   }, [currentStep, isPlaying, pattern, drumSynths])
 
-  const toggleStep = (soundKey: string, stepIndex: number) => {
+  const toggleStep = async (soundKey: string, stepIndex: number) => {
+    // 确保音频上下文已启动
+    if (Tone.context.state !== 'running') {
+      await Tone.start()
+    }
+    
     const newPattern = { ...pattern }
     if (!newPattern[soundKey]) {
       newPattern[soundKey] = new Array(STEPS).fill(false)
@@ -139,10 +156,15 @@ export const DrumMachine = ({
   }
 
   // 触发单个鼓声
-  const triggerSound = (soundKey: string) => {
+  const triggerSound = async (soundKey: string) => {
+    // 确保音频上下文已启动
+    if (Tone.context.state !== 'running') {
+      await Tone.start()
+    }
+    
     const synth = drumSynths[soundKey]
     if (synth) {
-      synth.triggerAttackRelease("C2", "8n")
+      playDrumSound(synth)
     }
   }
 

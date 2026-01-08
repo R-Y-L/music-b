@@ -6,16 +6,20 @@ interface TrackListProps {
   currentTime: number
   timelineWidth?: number
   pixelsPerSecond?: number
+  selectedTrackId?: string | null
+  onTrackSelect?: (trackId: string) => void
 }
 
 export const TrackList = ({ 
   currentTime, 
   timelineWidth = 800, 
-  pixelsPerSecond = 20 
+  pixelsPerSecond = 20,
+  selectedTrackId,
+  onTrackSelect
 }: TrackListProps) => {
   const {
     tracks,
-    createTrack,
+    createTypedTrack,
     deleteTrack,
     updateTrackVolume,
     updateTrackPan,
@@ -24,38 +28,26 @@ export const TrackList = ({
     clearAllTracks
   } = useTracks()
 
-  const handleCreateTrack = () => {
-    const colors = ['#30c48d', '#1f9bff', '#ff7b5f', '#b58cff', '#ffd93d', '#ff6b9d']
-    const randomColor = colors[Math.floor(Math.random() * colors.length)]
-    
-    createTrack({
-      name: `Track ${tracks.length + 1}`,
-      color: randomColor,
-      volume: -12,
-      pan: 0,
-      muted: false,
-      solo: false,
-      effects: []
-    })
-  }
-
   return (
     <div className="track-list">
       {/* 轨道操作 */}
       <div className="track-actions">
         <div className="row gap">
-          <button className="btn small outline" onClick={handleCreateTrack}>
-            + 新建轨道
+          <button className="btn small outline" onClick={() => createTypedTrack('instrument')}>
+            + 合成器
+          </button>
+          <button className="btn small outline" onClick={() => createTypedTrack('drums')}>
+            + 鼓机
           </button>
           <button 
             className="btn small ghost" 
             onClick={clearAllTracks}
             disabled={tracks.length === 0}
           >
-            清空轨道
+            清空
           </button>
           <div className="track-count">
-            <span className="muted">轨道数: {tracks.length}</span>
+            <span className="muted">{tracks.length} 轨道</span>
           </div>
         </div>
       </div>
@@ -64,11 +56,20 @@ export const TrackList = ({
       <div className="tracks-container">
         {tracks.length === 0 ? (
           <div className="empty-tracks">
-            <p className="muted">暂无轨道，点击"新建轨道"开始创作</p>
+            <p className="muted">暂无轨道，点击上方按钮开始创作</p>
           </div>
         ) : (
           tracks.map((track) => (
-            <div key={track.config.id} className="track-row">
+            <div 
+              key={track.config.id} 
+              className={`track-row ${selectedTrackId === track.config.id ? 'selected' : ''}`}
+              onClick={() => onTrackSelect?.(track.config.id)}
+              style={{
+                backgroundColor: selectedTrackId === track.config.id ? 'rgba(255,255,255,0.05)' : 'transparent',
+                cursor: 'pointer',
+                borderLeft: selectedTrackId === track.config.id ? `3px solid ${track.config.color}` : '3px solid transparent'
+              }}
+            >
               <TrackHeader
                 track={track}
                 onVolumeChange={(volume) => updateTrackVolume(track.config.id, volume)}
@@ -84,7 +85,7 @@ export const TrackList = ({
                 pixelsPerSecond={pixelsPerSecond}
                 onClipClick={(clip) => {
                   console.log('Clip clicked:', clip)
-                  // TODO: 实现片段编辑功能
+                  onTrackSelect?.(track.config.id)
                 }}
               />
             </div>

@@ -1,16 +1,20 @@
 import * as Tone from 'tone'
+import { trackManager } from './trackManager'
 
 export interface AudioEngine {
   isInitialized: boolean
   transport: typeof Tone.Transport
   context: typeof Tone.context
   initialize: () => Promise<void>
+  scheduleAllTracks: () => void
+  clearSchedule: () => void
   dispose: () => void
 }
 
 class DAWAudioEngine implements AudioEngine {
   private static instance: DAWAudioEngine | null = null
   public isInitialized: boolean = false
+  private scheduledParts: Tone.Part[] = []
 
   private constructor() {}
 
@@ -53,6 +57,7 @@ class DAWAudioEngine implements AudioEngine {
 
   play(): void {
     if (this.isInitialized) {
+      this.scheduleAllTracks()
       Tone.Transport.start()
     }
   }
@@ -66,7 +71,51 @@ class DAWAudioEngine implements AudioEngine {
   stop(): void {
     if (this.isInitialized) {
       Tone.Transport.stop()
+      this.clearSchedule()
     }
+  }
+
+  scheduleAllTracks(): void {
+    this.clearSchedule()
+    
+    const tracks = trackManager.getAllTracks()
+    
+    tracks.forEach(track => {
+      // 跳过静音或没有合成器的轨道
+      if (track.config.muted || !track.synth) return
+      
+      track.patterns.forEach(pattern => {
+        // 只处理有音符的pattern
+        if (!pattern.notes || pattern.notes.length === 0) return
+        
+        // 创建 Tone.Part 来调度音符
+        const part = new Tone.Part((time, note) => {
+          if (track.synth && 'triggerAttackRelease' in track.synth) {
+            const duration = Tone.Time(note.duration, 's').toSeconds()
+            track.synth.triggerAttackRelease(
+              note.note, 
+              duration, 
+              time, 
+              note.velocity / 127
+            )
+          }
+        }, pattern.notes.map(n => [n.time, n]))
+        
+        part.start(pattern.startTime)
+        part.loop = true
+        part.loopEnd = pattern.duration
+        
+        this.scheduledParts.push(part)
+      })
+    })
+  }
+
+  clearSchedule(): void {
+    this.scheduledParts.forEach(part => {
+      part.stop()
+      part.dispose()
+    })
+    this.scheduledParts = []
   }
 
   getCurrentTime(): number {
@@ -76,6 +125,7 @@ class DAWAudioEngine implements AudioEngine {
   dispose(): void {
     if (this.isInitialized) {
       Tone.Transport.stop()
+      this.clearSchedule()
       // 可以在这里清理其他资源
       this.isInitialized = false
     }
