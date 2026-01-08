@@ -5,7 +5,6 @@ import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
 import Daw from './pages/Daw'
 import PublishWork from './pages/PublishWork'
-import Social from './pages/Social'
 import WorkDetail from './pages/WorkDetail'
 import Works from './pages/Works'
 import { useAppStore } from './store/useAppStore'
@@ -13,9 +12,7 @@ import { useAppStore } from './store/useAppStore'
 const navItems = [
   { path: '/', label: '概览' },
   { path: '/works', label: '作品库' },
-  { path: '/publish', label: '发布' },
   { path: '/daw', label: 'DAW 演示' },
-  { path: '/social', label: '社交' },
 ]
 
 function Shell({ children }: { children: ReactNode }) {
@@ -70,7 +67,6 @@ export default function App() {
           <Route path="/works/:id" element={<WorkDetail />} />
           <Route path="/publish" element={<PublishWork />} />
           <Route path="/daw" element={<Daw />} />
-          <Route path="/social" element={<Social />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

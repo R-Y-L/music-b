@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import * as Tone from 'tone'
 import { instrumentPresets } from '../../audio/presets'
 
 interface SynthPadProps {
@@ -46,10 +47,45 @@ export const SynthPad = ({ trackId: _trackId, octave: initialOctave = 4, onNoteP
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set())
   const [currentPreset, setCurrentPreset] = useState(preset)
   const [octave, setOctave] = useState(initialOctave)
+  const [synth, setSynth] = useState<Tone.PolySynth<Tone.Synth> | null>(null)
+
+  // 初始化合成器
+  useEffect(() => {
+    const newSynth = new Tone.PolySynth(Tone.Synth).toDestination()
+    setSynth(newSynth)
+    
+    return () => {
+      newSynth.dispose()
+    }
+  }, [])
+
+  // 更新合成器预设
+  useEffect(() => {
+    if (synth) {
+      const presetConfig = instrumentPresets[currentPreset as keyof typeof instrumentPresets]
+      if (presetConfig) {
+        // 应用预设设置到合成器
+        if (presetConfig.settings) {
+          Object.entries(presetConfig.settings).forEach(([key, value]) => {
+            if (synth && synth[key as keyof Tone.PolySynth<Tone.Synth>]) {
+              const synthProp = synth[key as keyof Tone.PolySynth<Tone.Synth>]
+              if (synthProp && typeof synthProp === 'object' && value && typeof value === 'object') {
+                Object.assign(synthProp, value)
+              }
+            }
+          })
+        }
+      }
+    }
+  }, [currentPreset, synth])
 
   const handleNoteDown = (note: string) => {
-    if (!activeNotes.has(note)) {
+    if (!activeNotes.has(note) && synth) {
       setActiveNotes(prev => new Set([...prev, note]))
+      
+      // 播放音符
+      synth.triggerAttack(note, undefined, 0.3)
+      
       onNotePlay(note, 80) // 默认力度
     }
   }
@@ -60,6 +96,12 @@ export const SynthPad = ({ trackId: _trackId, octave: initialOctave = 4, onNoteP
       newSet.delete(note)
       return newSet
     })
+    
+    if (synth) {
+      // 释放音符
+      synth.triggerRelease(note)
+    }
+    
     onNoteStop(note)
   }
 

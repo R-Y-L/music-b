@@ -94,9 +94,7 @@ export default function Dashboard() {
               <p className="eyebrow">互动动态</p>
               <h3>最近 24 小时</h3>
             </div>
-            <Link to="/social" className="link">
-              查看全部
-            </Link>
+            {/* 社交模块已移除，保留最近互动预览，无跳转 */}
           </div>
           <ul className="timeline">
             {mockActivities.map((item) => (

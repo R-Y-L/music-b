@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import * as Tone from 'tone'
 
 interface Note {
+  id: string
   note: string
   velocity: number
   time: number
@@ -24,7 +26,18 @@ export const PianoRoll = ({
   noteRange: _noteRange 
 }: PianoRollProps) => {
   const [isPlaying, setIsPlaying] = useState(false)
-  const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set())
+  const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set())
+  const [synth, setSynth] = useState<Tone.PolySynth<Tone.Synth> | null>(null)
+
+  // 初始化合成器
+  useEffect(() => {
+    const newSynth = new Tone.PolySynth(Tone.Synth).toDestination()
+    setSynth(newSynth)
+    
+    return () => {
+      newSynth.dispose()
+    }
+  }, [])
 
   // Generate all notes in range
   const allNotes = OCTAVES.flatMap(octave => 
@@ -51,6 +64,7 @@ export const PianoRoll = ({
     } else {
       // 添加新音符
       const newNote: Note = {
+        id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         note,
         velocity: 80,
         time,
@@ -64,19 +78,65 @@ export const PianoRoll = ({
     return note.includes('#')
   }
 
+  // 播放单个音符
+  const playNote = useCallback((note: string, velocity: number = 80, duration: number = 0.5) => {
+    if (synth) {
+      synth.triggerAttackRelease(note, `${duration}n`, undefined, velocity / 127)
+    }
+  }, [synth])
+
+  // 播放所有音符
+  const playAllNotes = useCallback(() => {
+    if (!synth) return
+
+    // 创建音符序列
+    const sequence = new Tone.Sequence((time, note) => {
+      synth.triggerAttackRelease(note.note, `${note.duration}n`, time, note.velocity / 127)
+    }, notes, "8n")
+
+    Tone.Transport.bpm.value = 120
+    sequence.start(0)
+    Tone.Transport.start()
+    
+    return () => {
+      sequence.dispose()
+    }
+  }, [synth, notes])
+
+  // 切换播放状态
+  const togglePlayback = useCallback(() => {
+    if (isPlaying) {
+      Tone.Transport.stop()
+      setIsPlaying(false)
+    } else {
+      setIsPlaying(true)
+      playAllNotes()
+      
+      // 监听transport停止事件
+      Tone.Transport.scheduleOnce(() => {
+        setIsPlaying(false)
+      }, "+8m") // 在8小节后停止
+    }
+  }, [isPlaying, playAllNotes])
+
+  // 清空音符
+  const clearNotes = useCallback(() => {
+    onNotesChange([])
+  }, [onNotesChange])
+
   return (
     <div className="piano-roll">
       <div className="piano-roll-header">
         <div className="row gap">
           <button 
             className={`btn small ${isPlaying ? 'primary' : 'outline'}`}
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={togglePlayback}
           >
             {isPlaying ? '⏸️ 暂停' : '▶️ 播放'}
           </button>
           <button 
             className="btn small ghost"
-            onClick={() => onNotesChange([])}
+            onClick={clearNotes}
           >
             清空
           </button>
@@ -134,8 +194,8 @@ export const PianoRoll = ({
 
             return (
               <div 
-                key={index}
-                className={`note-block ${selectedNotes.has(index) ? 'selected' : ''}`}
+                key={note.id}
+                className={`note-block ${selectedNotes.has(note.id) ? 'selected' : ''}`}
                 style={{ 
                   left: `${leftPercent}%`,
                   top: `${noteIndex * 20 + 2}px`,
@@ -146,11 +206,13 @@ export const PianoRoll = ({
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
+                  playNote(note.note, note.velocity, note.duration)
+                  
                   const newSelected = new Set(selectedNotes)
-                  if (newSelected.has(index)) {
-                    newSelected.delete(index)
+                  if (newSelected.has(note.id)) {
+                    newSelected.delete(note.id)
                   } else {
-                    newSelected.add(index)
+                    newSelected.add(note.id)
                   }
                   setSelectedNotes(newSelected)
                 }}

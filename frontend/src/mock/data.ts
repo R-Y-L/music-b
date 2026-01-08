@@ -12,6 +12,7 @@ export type Work = {
   description: string
   createdAt: string
   stems: string[]
+  status: 'published' | 'draft'
 }
 
 export type Activity = {
@@ -49,6 +50,7 @@ export const mockWorks: Work[] = [
       'City-pop inspired groove with airy pads and a punchy bassline. Built for late-night drives.',
     createdAt: '2025-12-01',
     stems: ['Drums', 'Bass', 'Lead', 'Pads', 'FX'],
+    status: 'published',
   },
   {
     id: 'wk-002',
@@ -66,6 +68,7 @@ export const mockWorks: Work[] = [
       'Evolving textures with organic foley and string swells. Great for trailers and storytelling.',
     createdAt: '2025-11-27',
     stems: ['Strings', 'Percussion', 'Atmos', 'Piano'],
+    status: 'draft',
   },
   {
     id: 'wk-003',
@@ -83,6 +86,7 @@ export const mockWorks: Work[] = [
       'Driving kick, metallic percussion, and evolving arp lines designed for peak-time energy.',
     createdAt: '2025-11-14',
     stems: ['Kick', 'Perc', 'Arp', 'FX'],
+    status: 'published',
   },
 ]
 
